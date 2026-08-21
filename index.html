@@ -155,15 +155,18 @@ soffoco stringo spingo afferro trascino spezzo distruggo brucio spio inseguo ced
 imploro ricomincio respiro ingoio sudo gelo attendo osservo sorrido rido invecchio`.split(/\s+/));
 
 const AMBIGUI=new Set(`ricordo sogno lavoro gioco canto porto conto parto servo passo resto salto amo peso
-segno torno saluto viaggio disegno pranzo riposo grido urlo sparo perdono dubito volo firmo`.split(/\s+/));
+segno torno saluto viaggio disegno pranzo riposo grido urlo sparo perdono dubito volo firmo
+scopo volto ritorno destino fondo motivo scavo lavo covo salvo
+tratto verso vuoto punto specchio campo principio numero quadro muro titolo`.split(/\s+/));
 
-const NOMI_O=new Set(`modo tempo mondo uomo anno giorno corpo luogo punto momento fatto caso posto capo
-occhio braccio libro cielo mare fuoco vento sangue nome vetro legno muro letto tavolo bicchiere quadro
-silenzio rumore odore volto viso collo petto piede dito sguardo pensiero desiderio ritorno destino
-padre figlio popolo secolo numero seguito principio termine gruppo centro campo freddo caldo buio
-lato bordo fondo tratto verso passaggio percorso spazio periodo esempio effetto oggetto soggetto
-motivo scopo titolo capitolo foglio quaderno inchiostro specchio primo ultimo altro stesso solo
-questo quello proprio vero certo intero pieno vuoto lungo largo alto basso nuovo vecchio giovane`.split(/\s+/));
+const NOMI_O=new Set(`modo tempo mondo uomo anno giorno corpo luogo momento fatto caso posto capo
+occhio braccio libro cielo mare fuoco vento sangue nome vetro legno letto tavolo bicchiere
+silenzio rumore odore viso collo petto piede dito sguardo pensiero desiderio
+padre figlio popolo secolo seguito termine gruppo centro freddo caldo buio
+lato bordo passaggio percorso spazio periodo esempio effetto oggetto soggetto
+capitolo foglio quaderno inchiostro primo ultimo altro stesso solo
+questo quello proprio vero certo intero pieno lungo largo alto basso nuovo vecchio giovane
+nessuno ognuno qualcuno ciascuno tutto troppo poco molto tanto quanto piuttosto soltanto`.split(/\s+/));
 
 /* ---------- IMPERFETTO: desinenze regolarissime, coprono anche i verbi che non conosco ---------- */
 const IMP_IRR=new Set(['ero','avevo','ponevo','traevo','dicevo','facevo','bevevo']);
@@ -179,7 +182,11 @@ spensi giacqui crebbi accorsi trassi posi volsi vissi`.split(/\s+/));
 const NON_REM=new Set(`mai ormai assai omai guai lei dei nei sei rei`.split(/\s+/));
 
 const PART=/(ato|ata|ito|ita|uto|uta|sto|sta|so|ssa|tto|nto|rto|lto|isto|esso|erto|olto|into|unto)$/;
-const CLITICI=/\b(mi|me|mio|mia|miei|mie)\b/;
+const CLITICI=/\b(mi|me)\b/;   // il possessivo mio/mia non è indizio: "il mio ritorno" è un nome
+/* per le parole ambigue conta solo un attacco immediato: un clitico o una negazione davanti.
+   Il possessivo NON vale, perché "il mio ritorno" è proprio la lettura nominale. */
+const PROCLITICI=new Set(['mi','me','non','io','ti','ci','vi','lo','la','li','le','ne','gli','si']);
+const cueStretto=prec=>PROCLITICI.has(prec);
 
 /* ---------- filtro ---------- */
 function marcatore(f,o){
@@ -196,7 +203,7 @@ function marcatore(f,o){
     }
     if(o.tPres){
       if(PRES.has(w)||(o.apprendi&&lessico.has(w))){certo=true;esito=esito||'presente';continue;}
-      if(AMBIGUI.has(w)&&o.ambigui&&(cue||certo)){esito=esito||'presente';continue;}
+      if(AMBIGUI.has(w)&&o.ambigui&&(cueStretto(prec)||certo)){esito=esito||'presente';continue;}
       if(w.length>=5&&w.endsWith('o')&&!NOMI_O.has(w)&&!AMBIGUI.has(w)&&cue){esito=esito||'presente';continue;}
     }
     if(o.tImp){
