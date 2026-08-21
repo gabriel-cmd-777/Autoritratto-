@@ -62,6 +62,13 @@ button:focus-visible{outline:2px solid var(--blu);outline-offset:2px}
   margin-top:12px;text-align:justify;hyphens:auto}
 #autoritratto span{cursor:pointer}
 #autoritratto span:active{background:var(--scarto);color:var(--carta)}
+#autoritratto span.marcata{background:var(--scarto);color:var(--carta)}
+#avviso{font-size:11px;color:var(--scarto);min-height:16px;margin-top:8px}
+#cassetto{display:none;margin-top:8px;border:1px solid var(--linea);padding:8px;background:rgba(255,255,255,.5)}
+#campo{width:100%;height:150px;font:inherit;font-size:11px;line-height:1.5;border:none;
+  background:transparent;color:var(--inchiostro);resize:vertical}
+.cassetto-comandi{display:flex;gap:8px;margin-top:6px}
+.cassetto-comandi button{padding:7px 10px;font-size:11px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (min-width:600px){#frase{font-size:29px}}
 </style>
@@ -74,7 +81,8 @@ button:focus-visible{outline:2px solid var(--blu);outline-offset:2px}
 </header>
 
 <div class="pannello">
-  <input type="file" id="file" accept=".epub" multiple>
+  <input type="file" id="file" multiple>
+  <div class="stato" style="margin-top:6px">I file si sommano a ogni scelta. Su iPhone puoi anche aggiungerli uno alla volta. <button id="scarica" style="border:none;padding:0;font-size:11px;color:var(--scarto);text-decoration:underline">svuota serbatoi</button></div>
 
   <div class="gruppo">
     <div class="etichetta">Tempi ammessi</div>
@@ -113,6 +121,14 @@ button:focus-visible{outline:2px solid var(--blu);outline-offset:2px}
 <div class="testo-titolo">
   <span>Il testo</span>
   <span><button id="esporta">esporta</button> · <button id="svuota">svuota</button></span>
+</div>
+<div id="avviso"></div>
+<div id="cassetto">
+  <textarea id="campo" readonly></textarea>
+  <div class="cassetto-comandi">
+    <button id="copia">copia tutto</button>
+    <button id="chiudi">chiudi</button>
+  </div>
 </div>
 <div id="autoritratto"></div>
 
@@ -269,17 +285,30 @@ function disegna(){
 }
 
 $('file').addEventListener('change',async e=>{
-  const files=[...e.target.files]; if(!files.length)return;
-  grezze={};ordine=[];giro=0;
+  const files=[...e.target.files];
+  e.target.value='';                      // permette di riselezionare lo stesso file
+  if(!files.length)return;
   $('stato').textContent='Lettura…';
+  let errori=[];
   for(const f of files){
     const titolo=f.name.replace(/\.epub$/i,'');
-    try{ grezze[titolo]=await leggiEpub(f); ordine.push(titolo); }
-    catch(err){ $('stato').textContent='EPUB non leggibile: '+f.name; }
+    if(grezze[titolo]) continue;          // già in serbatoio
+    try{
+      const fr=await leggiEpub(f);
+      if(!fr.length){errori.push(titolo+' (nessun paragrafo)');continue;}
+      grezze[titolo]=fr; ordine.push(titolo);
+    }catch(err){ errori.push(titolo+' (non è un EPUB valido)'); }
   }
   rifiltra();
   const tot=ordine.reduce((s,n)=>s+grezze[n].length,0);
-  $('stato').textContent=`${ordine.length} file · ${tot} frasi lette · turno secco tra i file`;
+  $('stato').textContent=`${ordine.length} file · ${tot} frasi lette · turno secco tra i file`
+    + (errori.length?' — scartati: '+errori.join(', '):'');
+});
+
+$('scarica').addEventListener('click',()=>{
+  grezze={};ordine=[];giro=0;serbatoi={};
+  $('serbatoi').innerHTML='';$('nCand').textContent='0';$('pesca').disabled=true;
+  $('stato').textContent='Serbatoi svuotati. Carica gli EPUB.';
 });
 
 ['tPres','tImp','tPros','tRem','noDialogo','ambigui','apprendi']
@@ -323,19 +352,63 @@ $('salta').addEventListener('click',()=>{
   $('tieni').disabled=true;$('salta').disabled=true;
   if(!$('pesca').disabled)$('pesca').click();
 });
+/* rimozione a due tocchi: niente confirm(), che nelle anteprime in sandbox è bloccato */
+let daTogliere=null, timerTog=null;
 $('autoritratto').addEventListener('click',e=>{
   const s=e.target.closest('span');if(!s)return;
-  if(confirm('Togliere questa frase?')){tenute.splice(+s.dataset.i,1);Store.scrivi('autoritratto',tenute);disegna();}
+  const i=+s.dataset.i;
+  if(daTogliere===i){
+    clearTimeout(timerTog);daTogliere=null;
+    tenute.splice(i,1);Store.scrivi('autoritratto',tenute);disegna();
+    $('avviso').textContent='Frase tolta.';
+    return;
+  }
+  daTogliere=i;
+  document.querySelectorAll('#autoritratto span').forEach(x=>x.classList.remove('marcata'));
+  s.classList.add('marcata');
+  $('avviso').textContent='Tocca di nuovo la stessa frase per toglierla.';
+  clearTimeout(timerTog);
+  timerTog=setTimeout(()=>{daTogliere=null;s.classList.remove('marcata');$('avviso').textContent='';},4000);
 });
+
+function testoCompleto(){
+  return tenute.map(t=>t.f).join(' ')+'\n\n\n---\nFonti\n'+tenute.map(t=>t.f+'  < '+t.fonte).join('\n');
+}
+
 $('esporta').addEventListener('click',()=>{
-  if(!tenute.length)return;
-  const testo=tenute.map(t=>t.f).join(' ')+'\n\n\n---\nFonti\n'+tenute.map(t=>t.f+'  < '+t.fonte).join('\n');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([testo],{type:'text/plain'}));
-  a.download='autoritratto.txt';a.click();
+  if(!tenute.length){$('avviso').textContent='Non c\u2019è ancora niente da esportare.';return;}
+  const testo=testoCompleto();
+  $('campo').value=testo;
+  $('cassetto').style.display='block';
+  $('campo').focus();$('campo').select();
+  try{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([testo],{type:'text/plain'}));
+    a.download='autoritratto.txt';a.click();
+    $('avviso').textContent='Se il file non è stato scaricato, copia il testo qui sotto.';
+  }catch(err){
+    $('avviso').textContent='Download bloccato dal browser: copia il testo qui sotto.';
+  }
 });
+
+$('copia').addEventListener('click',async()=>{
+  try{ await navigator.clipboard.writeText($('campo').value); $('avviso').textContent='Copiato.'; }
+  catch(e){ $('campo').select();document.execCommand('copy');$('avviso').textContent='Copiato.'; }
+});
+$('chiudi').addEventListener('click',()=>{$('cassetto').style.display='none';$('avviso').textContent='';});
+
+/* svuota a due tocchi */
+let confSvuota=false, timerSv=null;
 $('svuota').addEventListener('click',()=>{
-  if(tenute.length&&confirm('Svuotare tutto il testo?')){tenute=[];Store.scrivi('autoritratto',tenute);disegna();}
+  if(!tenute.length)return;
+  if(confSvuota){
+    clearTimeout(timerSv);confSvuota=false;$('svuota').textContent='svuota';
+    tenute=[];Store.scrivi('autoritratto',tenute);disegna();$('avviso').textContent='Testo svuotato.';
+    return;
+  }
+  confSvuota=true;$('svuota').textContent='confermi?';
+  clearTimeout(timerSv);
+  timerSv=setTimeout(()=>{confSvuota=false;$('svuota').textContent='svuota';},4000);
 });
 disegna();
 </script>
