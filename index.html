@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Autoritratto — pesca di frasi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;1,300&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --carta:#E6E8E6;
+  --inchiostro:#16181A;
+  --grigio:#6E7472;
+  --linea:#C6CAC7;
+  --blu:#2C4A63;
+  --scarto:#9A5B4C;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--carta);color:var(--inchiostro);
+  font-family:'IBM Plex Mono',ui-monospace,monospace;
+  font-size:13px;line-height:1.5;
+  padding:20px 18px 64px;max-width:720px;margin:0 auto;
+  padding-bottom:calc(64px + env(safe-area-inset-bottom));
+}
+header{display:flex;justify-content:space-between;align-items:baseline;
+  border-bottom:1px solid var(--linea);padding-bottom:8px;margin-bottom:18px}
+h1{font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;margin:0;color:var(--grigio)}
+.conta{font-size:11px;color:var(--grigio);font-variant-numeric:tabular-nums}
+.pannello{border:1px solid var(--linea);padding:12px;margin-bottom:18px;background:rgba(255,255,255,.35)}
+input[type=file]{font:inherit;font-size:11px;width:100%}
+.gruppo{margin-top:11px}
+.etichetta{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--grigio);margin-bottom:5px}
+.opzioni{display:flex;flex-wrap:wrap;gap:6px}
+.opzioni label{display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;
+  border:1px solid var(--linea);padding:4px 8px;color:var(--grigio)}
+.opzioni label:has(input:checked){border-color:var(--inchiostro);color:var(--inchiostro)}
+input[type=checkbox]{accent-color:var(--blu);margin:0}
+.stato{font-size:11px;color:var(--grigio);margin-top:10px;min-height:16px}
+.serbatoi{font-size:10px;color:var(--grigio);margin-top:6px;line-height:1.7}
+.scena{min-height:170px;display:flex;flex-direction:column;justify-content:center;padding:8px 0 16px}
+#frase{font-family:'Spectral',Georgia,serif;font-weight:300;font-size:24px;line-height:1.34;letter-spacing:-.01em;margin:0}
+#frase.vuoto{font-size:15px;color:var(--grigio);font-style:italic}
+#fonte{font-size:10px;color:var(--grigio);margin-top:12px;letter-spacing:.06em}
+.comandi{display:flex;gap:8px;margin-bottom:26px}
+button{font:inherit;font-size:12px;letter-spacing:.04em;border:1px solid var(--inchiostro);
+  background:transparent;color:var(--inchiostro);padding:11px 14px;cursor:pointer;border-radius:0;
+  transition:background .12s,color .12s}
+button:disabled{opacity:.3;cursor:default}
+button:not(:disabled):active{background:var(--inchiostro);color:var(--carta)}
+#pesca{flex:1;background:var(--inchiostro);color:var(--carta);font-weight:500}
+#tieni{border-color:var(--blu);color:var(--blu)}
+#salta{border-color:var(--scarto);color:var(--scarto)}
+button:focus-visible{outline:2px solid var(--blu);outline-offset:2px}
+.testo-titolo{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--grigio);
+  border-top:1px solid var(--linea);padding-top:10px;display:flex;justify-content:space-between;align-items:baseline}
+.testo-titolo button{border:none;padding:2px 0;font-size:10px;letter-spacing:.08em;color:var(--grigio);text-decoration:underline}
+#autoritratto{font-family:'Spectral',Georgia,serif;font-weight:300;font-size:17px;line-height:1.62;
+  margin-top:12px;text-align:justify;hyphens:auto}
+#autoritratto span{cursor:pointer}
+#autoritratto span:active{background:var(--scarto);color:var(--carta)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (min-width:600px){#frase{font-size:29px}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Autoritratto</h1>
+  <div class="conta"><span id="nCand">0</span> in serbatoio · <span id="nTen">0</span> tenute</div>
+</header>
+
+<div class="pannello">
+  <input type="file" id="file" accept=".epub" multiple>
+
+  <div class="gruppo">
+    <div class="etichetta">Tempi ammessi</div>
+    <div class="opzioni">
+      <label><input type="checkbox" id="tPres" checked> presente</label>
+      <label><input type="checkbox" id="tImp" checked> imperfetto</label>
+      <label><input type="checkbox" id="tPros" checked> passato prossimo</label>
+      <label><input type="checkbox" id="tRem"> passato remoto</label>
+    </div>
+  </div>
+
+  <div class="gruppo">
+    <div class="etichetta">Rumore</div>
+    <div class="opzioni">
+      <label><input type="checkbox" id="noDialogo" checked> escludi dialoghi</label>
+      <label><input type="checkbox" id="ambigui" checked> verbi ambigui</label>
+      <label><input type="checkbox" id="apprendi" checked> lessico appreso</label>
+    </div>
+  </div>
+
+  <div class="stato" id="stato">Carica uno o più EPUB. Nessun limite di numero.</div>
+  <div class="serbatoi" id="serbatoi"></div>
+</div>
+
+<div class="scena">
+  <p id="frase" class="vuoto">Il serbatoio è vuoto.</p>
+  <div id="fonte"></div>
+</div>
+
+<div class="comandi">
+  <button id="pesca" disabled>Pesca</button>
+  <button id="tieni" disabled>Tieni</button>
+  <button id="salta" disabled>Scarta</button>
+</div>
+
+<div class="testo-titolo">
+  <span>Il testo</span>
+  <span><button id="esporta">esporta</button> · <button id="svuota">svuota</button></span>
+</div>
+<div id="autoritratto"></div>
+
+<script>
+/* ---------- persistenza tollerante ---------- */
+let memT=[], memL=[];
+const Store={
+  leggi(k,d){try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}},
+  scrivi(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+};
+let tenute=Store.leggi('autoritratto',[]);
+let lessico=new Set(Store.leggi('lessico',[]));
+
+/* ---------- PRESENTE ---------- */
+const PRES=new Set(`sono ho sto do so vado vengo faccio dico esco posso voglio devo tengo ottengo mantengo
+appartengo rimango scelgo colgo tolgo salgo spengo pongo propongo suppongo traggo riesco conosco cresco nasco
+muoio piaccio taccio siedo cado vedo chiedo prendo rendo scendo spendo perdo rispondo nascondo vivo scrivo
+descrivo ricevo muovo bevo leggo corro offro soffro apro copro scopro dormo avverto vinco dipendo distinguo
+insisto resisto esisto assisto capisco finisco preferisco costruisco stupisco tradisco obbedisco subisco
+penso credo spero aspetto guardo ascolto cammino arrivo entro cerco trovo chiamo aiuto mangio compro lascio
+dimentico immagino considero provo cambio continuo comincio smetto aggiungo ammetto prometto permetto metto
+uccido colpisco ferisco aggredisco mento rubo fuggo scappo minaccio odio disprezzo temo tremo sanguino piango
+soffoco stringo spingo afferro trascino spezzo distruggo brucio spio inseguo cedo confesso nego giuro prego
+imploro ricomincio respiro ingoio sudo gelo attendo osservo sorrido rido invecchio`.split(/\s+/));
+
+const AMBIGUI=new Set(`ricordo sogno lavoro gioco canto porto conto parto servo passo resto salto amo peso
+segno torno saluto viaggio disegno pranzo riposo grido urlo sparo perdono dubito volo firmo`.split(/\s+/));
+
+const NOMI_O=new Set(`modo tempo mondo uomo anno giorno corpo luogo punto momento fatto caso posto capo
+occhio braccio libro cielo mare fuoco vento sangue nome vetro legno muro letto tavolo bicchiere quadro
+silenzio rumore odore volto viso collo petto piede dito sguardo pensiero desiderio ritorno destino
+padre figlio popolo secolo numero seguito principio termine gruppo centro campo freddo caldo buio
+lato bordo fondo tratto verso passaggio percorso spazio periodo esempio effetto oggetto soggetto
+motivo scopo titolo capitolo foglio quaderno inchiostro specchio primo ultimo altro stesso solo
+questo quello proprio vero certo intero pieno vuoto lungo largo alto basso nuovo vecchio giovane`.split(/\s+/));
+
+/* ---------- IMPERFETTO: desinenze regolarissime, coprono anche i verbi che non conosco ---------- */
+const IMP_IRR=new Set(['ero','avevo','ponevo','traevo','dicevo','facevo','bevevo']);
+const NON_IMP=new Set(`schiavo bravo cavo scavo ottavo lavo covo nuovo medioevo motivo obiettivo attivo
+cattivo vivo primitivo positivo negativo festivo nativo passivo massivo pensativo divo rivo estivo
+salvo calvo servo nervo corvo`.split(/\s+/));
+
+/* ---------- PASSATO REMOTO ---------- */
+const REM_IRR=new Set(`fui ebbi feci dissi vidi venni seppi volli tenni presi misi scrissi lessi chiesi
+risposi corsi scelsi rimasi giunsi nacqui bevvi caddi conobbi piansi ruppi spinsi strinsi vinsi persi
+mossi dovetti potei stetti diedi detti scesi chiusi aprii apersi morii tacqui piacqui nascosi resi
+spensi giacqui crebbi accorsi trassi posi volsi vissi`.split(/\s+/));
+const NON_REM=new Set(`mai ormai assai omai guai lei dei nei sei rei`.split(/\s+/));
+
+const PART=/(ato|ata|ito|ita|uto|uta|sto|sta|so|ssa|tto|nto|rto|lto|isto|esso|erto|olto|into|unto)$/;
+const CLITICI=/\b(mi|me|mio|mia|miei|mie)\b/;
+
+/* ---------- filtro ---------- */
+function marcatore(f,o){
+  const par=f.toLowerCase().replace(/[«»""''\(\)\[\];:,]/g,' ').split(/\s+/).filter(Boolean)
+    .map(w=>w.replace(/[.!?…]+$/,'')).filter(Boolean);
+  const clit=CLITICI.test(' '+par.join(' ')+' ');
+  let certo=false, esito=null;
+
+  for(let i=0;i<par.length;i++){
+    const w=par[i], prec=par[i-1]||'', cue=clit||prec==='non'||prec==='io';
+
+    if(o.tPros && (w==='ho'||w==='sono')){
+      if(PART.test(par[i+1]||'')||PART.test(par[i+2]||'')){certo=true;esito=esito||'prossimo';continue;}
+    }
+    if(o.tPres){
+      if(PRES.has(w)||(o.apprendi&&lessico.has(w))){certo=true;esito=esito||'presente';continue;}
+      if(AMBIGUI.has(w)&&o.ambigui&&(cue||certo)){esito=esito||'presente';continue;}
+      if(w.length>=5&&w.endsWith('o')&&!NOMI_O.has(w)&&!AMBIGUI.has(w)&&cue){esito=esito||'presente';continue;}
+    }
+    if(o.tImp){
+      if(IMP_IRR.has(w)){certo=true;esito=esito||'imperfetto';continue;}
+      if(w.length>=5&&/(avo|evo|ivo)$/.test(w)&&!NON_IMP.has(w)){certo=true;esito=esito||'imperfetto';continue;}
+    }
+    if(o.tRem){
+      if(REM_IRR.has(w)){certo=true;esito=esito||'remoto';continue;}
+      if(w.length>=5&&/(ai|ii|etti)$/.test(w)&&!NON_REM.has(w)){certo=true;esito=esito||'remoto';continue;}
+    }
+  }
+  return esito;
+}
+
+function accettabile(f,o){
+  const n=f.split(/\s+/).length;
+  if(n<4||n>30) return false;
+  if(/[0-9]{2,}/.test(f)) return false;
+  if(o.noDialogo && /[«»""]|^\s*[—–-]\s/.test(f)) return false;
+  if(!/^[A-ZÀÈÉÌÒÙ]/.test(f)) return false;
+  return !!marcatore(f,o);
+}
+
+/* apprendimento: dalle frasi TENUTE, le parole ammesse solo per indizio diventano certe */
+function impara(f){
+  const par=f.toLowerCase().replace(/[«»""''\(\)\[\];:,.!?…]/g,' ').split(/\s+/).filter(Boolean);
+  let nuove=0;
+  par.forEach(w=>{
+    if(w.length>=5&&w.endsWith('o')&&!NOMI_O.has(w)&&!PRES.has(w)&&!lessico.has(w)&&!/(avo|evo|ivo)$/.test(w)){
+      lessico.add(w);nuove++;
+    }
+  });
+  if(nuove)Store.scrivi('lessico',[...lessico]);
+}
+
+/* ---------- estrazione ---------- */
+const ABBR=/\b(sig|dott|prof|ecc|cfr|op|cit|pag|vol|ing|avv|on|sec|a\.C|d\.C)\.$/i;
+function inFrasi(t){
+  const pezzi=t.split(/(?<=[.!?…])\s+(?=[«"'A-ZÀÈÉÌÒÙ])/);
+  const out=[];let buf='';
+  for(const p of pezzi){
+    buf=buf?buf+' '+p:p;
+    if(!ABBR.test(buf.trim())){out.push(buf.trim());buf='';}
+  }
+  if(buf)out.push(buf.trim());
+  return out;
+}
+async function leggiEpub(file){
+  const zip=await JSZip.loadAsync(file);
+  const nomi=Object.keys(zip.files).filter(n=>/\.(x?html|htm)$/i.test(n)).sort();
+  const frasi=[];
+  for(const n of nomi){
+    const html=await zip.files[n].async('string');
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    doc.querySelectorAll('p').forEach(p=>{
+      const t=p.textContent.replace(/\s+/g,' ').trim();
+      if(t.length>30) frasi.push(...inFrasi(t));
+    });
+  }
+  return frasi;
+}
+
+/* ---------- stato ---------- */
+let grezze={}, serbatoi={}, ordine=[], giro=0, corrente=null;
+const $=id=>document.getElementById(id);
+const opzioni=()=>({tPres:$('tPres').checked,tImp:$('tImp').checked,tPros:$('tPros').checked,
+  tRem:$('tRem').checked,noDialogo:$('noDialogo').checked,ambigui:$('ambigui').checked,apprendi:$('apprendi').checked});
+
+function rifiltra(){
+  const o=opzioni(), visti=new Set(tenute.map(t=>t.f));
+  let tot=0;
+  serbatoi={};
+  ordine.forEach(nome=>{
+    serbatoi[nome]=grezze[nome].filter(f=>!visti.has(f)&&accettabile(f,o));
+    tot+=serbatoi[nome].length;
+  });
+  $('nCand').textContent=tot;
+  $('pesca').disabled=tot===0;
+  $('serbatoi').innerHTML=ordine.map((n,i)=>
+    `${i+1}. ${n} — ${serbatoi[n].length}`).join('<br>');
+  if(tot===0&&ordine.length) $('stato').textContent='Nessuna frase supera il filtro. Allarga i tempi ammessi.';
+}
+function disegna(){
+  $('nTen').textContent=tenute.length;
+  $('autoritratto').innerHTML=tenute.map((t,i)=>`<span data-i="${i}" title="${t.fonte}">${t.f}</span>`).join(' ');
+}
+
+$('file').addEventListener('change',async e=>{
+  const files=[...e.target.files]; if(!files.length)return;
+  grezze={};ordine=[];giro=0;
+  $('stato').textContent='Lettura…';
+  for(const f of files){
+    const titolo=f.name.replace(/\.epub$/i,'');
+    try{ grezze[titolo]=await leggiEpub(f); ordine.push(titolo); }
+    catch(err){ $('stato').textContent='EPUB non leggibile: '+f.name; }
+  }
+  rifiltra();
+  const tot=ordine.reduce((s,n)=>s+grezze[n].length,0);
+  $('stato').textContent=`${ordine.length} file · ${tot} frasi lette · turno secco tra i file`;
+});
+
+['tPres','tImp','tPros','tRem','noDialogo','ambigui','apprendi']
+  .forEach(id=>$(id).addEventListener('change',rifiltra));
+
+/* pesca a turno secco: file 1, 2, 3, 4, 1... saltando i serbatoi esauriti */
+$('pesca').addEventListener('click',()=>{
+  if(!ordine.length)return;
+  let tentativi=0, nome=null;
+  while(tentativi<ordine.length){
+    const cand=ordine[giro%ordine.length];
+    giro++;tentativi++;
+    if(serbatoi[cand]&&serbatoi[cand].length){nome=cand;break;}
+  }
+  if(!nome){$('pesca').disabled=true;return;}
+  const pool=serbatoi[nome];
+  const i=Math.floor(Math.random()*pool.length);
+  corrente={f:pool.splice(i,1)[0],fonte:nome};
+  $('frase').textContent=corrente.f;
+  $('frase').classList.remove('vuoto');
+  const pos=ordine.indexOf(nome)+1;
+  $('fonte').textContent=`< ${nome}  ·  ${pos}/${ordine.length}`;
+  rifiltraConta();
+  $('tieni').disabled=false;$('salta').disabled=false;
+});
+function rifiltraConta(){
+  const tot=ordine.reduce((s,n)=>s+(serbatoi[n]?serbatoi[n].length:0),0);
+  $('nCand').textContent=tot;
+  $('pesca').disabled=tot===0;
+  $('serbatoi').innerHTML=ordine.map((n,i)=>`${i+1}. ${n} — ${serbatoi[n].length}`).join('<br>');
+}
+
+$('tieni').addEventListener('click',()=>{
+  if(!corrente)return;
+  tenute.push(corrente);Store.scrivi('autoritratto',tenute);
+  if($('apprendi').checked)impara(corrente.f);
+  disegna();
+  $('tieni').disabled=true;$('salta').disabled=true;
+});
+$('salta').addEventListener('click',()=>{
+  $('tieni').disabled=true;$('salta').disabled=true;
+  if(!$('pesca').disabled)$('pesca').click();
+});
+$('autoritratto').addEventListener('click',e=>{
+  const s=e.target.closest('span');if(!s)return;
+  if(confirm('Togliere questa frase?')){tenute.splice(+s.dataset.i,1);Store.scrivi('autoritratto',tenute);disegna();}
+});
+$('esporta').addEventListener('click',()=>{
+  if(!tenute.length)return;
+  const testo=tenute.map(t=>t.f).join(' ')+'\n\n\n---\nFonti\n'+tenute.map(t=>t.f+'  < '+t.fonte).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([testo],{type:'text/plain'}));
+  a.download='autoritratto.txt';a.click();
+});
+$('svuota').addEventListener('click',()=>{
+  if(tenute.length&&confirm('Svuotare tutto il testo?')){tenute=[];Store.scrivi('autoritratto',tenute);disegna();}
+});
+disegna();
+</script>
+</body>
+</html>
