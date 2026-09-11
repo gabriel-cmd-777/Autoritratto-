@@ -267,6 +267,36 @@ async function leggiEpub(file){
 }
 
 /* ---------- stato ---------- */
+/* ---------- archivio dei serbatoi (IndexedDB: localStorage non regge interi libri) ---------- */
+const DB={
+  apri(){
+    return new Promise((ris,rif)=>{
+      const r=indexedDB.open('autoritratto',1);
+      r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains('libri')) r.result.createObjectStore('libri',{keyPath:'nome'}); };
+      r.onsuccess=()=>ris(r.result); r.onerror=()=>rif(r.error);
+    });
+  },
+  async salva(nome,frasi){
+    try{ const db=await DB.apri();
+      await new Promise((ris,rif)=>{ const t=db.transaction('libri','readwrite');
+        t.objectStore('libri').put({nome,frasi,quando:Date.now()});
+        t.oncomplete=ris; t.onerror=()=>rif(t.error); });
+    }catch(e){ console.warn('archivio non disponibile',e); }
+  },
+  async tutti(){
+    try{ const db=await DB.apri();
+      return await new Promise((ris,rif)=>{ const r=db.transaction('libri').objectStore('libri').getAll();
+        r.onsuccess=()=>ris(r.result||[]); r.onerror=()=>rif(r.error); });
+    }catch(e){ return []; }
+  },
+  async svuota(){
+    try{ const db=await DB.apri();
+      await new Promise(ris=>{ const t=db.transaction('libri','readwrite');
+        t.objectStore('libri').clear(); t.oncomplete=ris; });
+    }catch(e){}
+  }
+};
+
 let grezze={}, serbatoi={}, ordine=[], giro=0, corrente=null;
 const $=id=>document.getElementById(id);
 const opzioni=()=>({tPres:$('tPres').checked,tImp:$('tImp').checked,tPros:$('tPros').checked,
@@ -303,7 +333,7 @@ $('file').addEventListener('change',async e=>{
     try{
       const fr=await leggiEpub(f);
       if(!fr.length){errori.push(titolo+' (nessun paragrafo)');continue;}
-      grezze[titolo]=fr; ordine.push(titolo);
+      grezze[titolo]=fr; ordine.push(titolo); await DB.salva(titolo,fr);
     }catch(err){ errori.push(titolo+' (non è un EPUB valido)'); }
   }
   rifiltra();
@@ -312,7 +342,8 @@ $('file').addEventListener('change',async e=>{
     + (errori.length?' — scartati: '+errori.join(', '):'');
 });
 
-$('scarica').addEventListener('click',()=>{
+$('scarica').addEventListener('click',async()=>{
+  await DB.svuota();
   grezze={};ordine=[];giro=0;serbatoi={};
   $('serbatoi').innerHTML='';$('nCand').textContent='0';$('pesca').disabled=true;
   $('stato').textContent='Serbatoi svuotati. Carica gli EPUB.';
@@ -418,6 +449,17 @@ $('svuota').addEventListener('click',()=>{
   timerSv=setTimeout(()=>{confSvuota=false;$('svuota').textContent='svuota';},4000);
 });
 disegna();
+
+/* all'avvio rimetto in piedi i serbatoi archiviati */
+(async()=>{
+  const libri=await DB.tutti();
+  if(!libri.length){ $('stato').textContent='Carica uno o più EPUB. Nessun limite di numero.'; return; }
+  libri.sort((a,b)=>a.quando-b.quando);
+  libri.forEach(l=>{ grezze[l.nome]=l.frasi; ordine.push(l.nome); });
+  rifiltra();
+  const tot=ordine.reduce((s,n)=>s+grezze[n].length,0);
+  $('stato').textContent=`${ordine.length} file ripresi dall\u2019archivio · ${tot} frasi · turno secco tra i file`;
+})();
 </script>
 </body>
 </html>
